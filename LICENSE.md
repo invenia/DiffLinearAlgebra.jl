@@ -1,6 +1,6 @@
 The DiffLinAlg.jl package is licensed under the MIT "Expat" License:
 
-> Copyright (c) 2018: [A[A[A[B[B[Bwilltebbutt.
+> Copyright (c) 2018 Invenia Technical Computing
 >
 > Permission is hereby granted, free of charge, to any person obtaining a copy
 > of this software and associated documentation files (the "Software"), to deal
@@ -19,4 +19,3 @@ The DiffLinAlg.jl package is licensed under the MIT "Expat" License:
 > LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 > SOFTWARE.
->
