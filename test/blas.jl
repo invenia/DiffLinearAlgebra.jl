@@ -1,150 +1,255 @@
 @testset "BLAS" begin
-    import Base.BLAS.dot
-    let rng = MersenneTwister(123456)
-        for _ in 1:10
-            x, y, vx, vy = randn.(rng, [5, 5, 5, 5])
-            @test check_errs(dot, dot(x ,y), (x, y), (vx, vy))
-        end
-    end
-    let rng = MersenneTwister(123456)
-        for _ in 1:10
-            x, y, vx, vy = randn.(rng, [10, 6, 10, 6])
-            _dot = (x, y)->dot(5, x, 2, y, 1)
-            @test check_errs(_dot, _dot(x, y), (x, y), (vx, vy))
-        end
+
+import Base.BLAS: dot, nrm2, asum, gemm, gemv, symm, symv, trmm, trmv, trsm, trsv
+
+
+################################## Level 1 ##################################
+let P = 10, Q = 6, rng = MersenneTwister(123456), N = 10
+
+    # Utility random generators.
+    sc, vP, vQ = ()->randn(rng), ()->randn(rng, P), ()->randn(rng, Q)
+
+    # Unit-stride dot.
+    @test check_errs(N, binary_ȲD(dot, 1, vP)..., sc, vP, vP)
+    @test check_errs(N, binary_ȲD(dot, 2, vP)..., sc, vP, vP)
+    @test check_errs(N, binary_ȲD_inplace(dot, 1, vP, zeros(P))..., sc, vP, vP)
+    @test check_errs(N, binary_ȲD_inplace(dot, 2, vP, zeros(P))..., sc, vP, vP)
+
+    # Strided dot.
+    _x, _y = vP(), vQ()
+    _dot2, _dot4 = x->dot(5, x, 2, _y, 1), y->dot(5, _x, 2, y, 1)
+    _∇dot2 = (z, z̄, x)->∇(dot, Val{2}, (), z, z̄, 5, x, 2, _y, 1)
+    _∇dot4 = (z, z̄, y)->∇(dot, Val{4}, (), z, z̄, 5, _x, 2, y, 1)
+    @test check_errs(N, _dot2, _∇dot2, sc, vP, vP)
+    @test check_errs(N, _dot4, _∇dot4, sc, vQ, vQ)
+
+    # In-place strided dot.
+    _∇dot2 = (z, z̄, x)->∇(zeros(P), dot, Val{2}, (), z, z̄, 5, x, 2, _y, 1)
+    _∇dot4 = (z, z̄, y)->∇(zeros(Q), dot, Val{4}, (), z, z̄, 5, _x, 2, y, 1)
+    @test check_errs(N, _dot2, _∇dot2, sc, vP, vP)
+    @test check_errs(N, _dot4, _∇dot4, sc, vQ, vQ)
+
+    # Unit-stride nrm2.
+    @test check_errs(N, unary_ȲD(nrm2)..., sc, vP, vP)
+    @test check_errs(N, unary_ȲD_inplace(nrm2, zeros(P))..., sc, vP, vP)
+
+    # Arbitrary-stride nrm2.
+    _nrm2 = x->nrm2(5, x, 2)
+    _∇nrm2 = (y, ȳ, x)->∇(nrm2, Val{2}, (), y, ȳ, 5, x, 2)
+    _∇nrm2_in_place = (y, ȳ, x)->∇(zeros(P), nrm2, Val{2}, (), y, ȳ, 5, x, 2)
+    @test check_errs(N, _nrm2, _∇nrm2, sc, vP, vP)
+    @test check_errs(N, _nrm2, _∇nrm2_in_place, sc, vP, vP)
+
+    # Unit-stride `asum`.
+    @test check_errs(N, unary_ȲD(asum)..., sc, vP, vP)
+    @test check_errs(N, unary_ȲD_inplace(asum, zeros(P))..., sc, vP, vP)
+
+    # Arbitrary-stride `asum`.
+    _asum = x->asum(5, x, 2)
+    _∇asum = (y, ȳ, x)->∇(asum, Val{2}, (), y, ȳ, 5, x, 2)
+    _∇asum_in_place = (y, ȳ, x)->∇(zeros(P), asum, Val{2}, (), y, ȳ, 5, x, 2)
+    @test check_errs(N, _asum, _∇asum, sc, vP, vP)
+    @test check_errs(N, _asum, _∇asum_in_place, sc, vP, vP)
+end
+
+
+################################## Level 2 ##################################
+let P = 10, Q = 6, rng = MersenneTwister(123456), N = 10
+
+    # Utility random generators.
+    sc, vP, vQ = ()->randn(rng), ()->randn(rng, P), ()->randn(rng, Q)
+    mPQ, mQP = ()->randn(rng, P, Q), ()->randn(rng, Q, P)
+    mPP = ()->randn(rng, P, P)
+
+    # gemv:
+    for tA in ['T', 'N']
+        _α, _x = sc(), vQ()
+        _A = tA == 'N' ? mPQ() : mQP()
+        A = tA == 'N' ? mPQ : mQP
+
+        # α != 1 tests.
+        _gemv1 = α->gemv(tA, α, _A, _x)
+        _gemv2 = A->gemv(tA, _α, A, _x)
+        _gemv3 = x->gemv(tA, _α, _A, x)
+        _∇gemv1 = (y, ȳ, α)->∇(gemv, Val{2}, (), y, ȳ, tA, α, _A, _x)
+        _∇gemv2 = (y, ȳ, A)->∇(gemv, Val{3}, (), y, ȳ, tA, _α, A, _x)
+        _∇gemv2_inp = (y, ȳ, A)->∇(fill!(similar(A), 0), gemv, Val{3}, (), y, ȳ, tA, _α, A, _x)
+        _∇gemv3 = (y, ȳ, x)->∇(gemv, Val{4}, (), y, ȳ, tA, _α, _A, x)
+        _∇gemv3_inp = (y, ȳ, x)->∇(zeros(Q), gemv, Val{4}, (), y, ȳ, tA, _α, _A, x)
+
+        @test check_errs(N, _gemv1, _∇gemv1, vP, sc, sc)
+        @test check_errs(N, _gemv2, _∇gemv2, vP, A, A)
+        @test check_errs(N, _gemv2, _∇gemv2_inp, vP, A, A)
+        @test check_errs(N, _gemv3, _∇gemv3, vP, vQ, vQ)
+        @test check_errs(N, _gemv3, _∇gemv3_inp, vP, vQ, vQ)
+
+        # α = 1 tests.
+        _gemv1, _gemv2 = A->gemv(tA, A, _x), x->gemv(tA, _A, x)
+        _∇gemv1 = (y, ȳ, A)->∇(gemv, Val{2}, (), y, ȳ, tA, A, _x)
+        _∇gemv1_inp = (y, ȳ, A)->∇(fill!(similar(A), 0), gemv, Val{2}, (), y, ȳ, tA, A, _x)
+        _∇gemv2 = (y, ȳ, x)->∇(gemv, Val{3}, (), y, ȳ, tA, _A, x)
+        _∇gemv2_inp = (y, ȳ, x)->∇(zeros(Q), gemv, Val{3}, (), y, ȳ, tA, _A, x)
+
+        @test check_errs(N, _gemv1, _∇gemv1, vP, A, A)
+        @test check_errs(N, _gemv1, _∇gemv1_inp, vP, A, A)
+        @test check_errs(N, _gemv2, _∇gemv2, vP, vQ, vQ)
+        @test check_errs(N, _gemv2, _∇gemv2_inp, vP, vQ, vQ)
     end
 
-    import Base.BLAS.nrm2
-    let rng = MersenneTwister(123456)
-        for _ in 1:10
-            x, vx = randn(rng, 100), randn(rng, 100)
-            @test check_errs(nrm2, randn(rng), x, vx)
-        end
-    end
-    let rng = MersenneTwister(123456)
-        λ = x->nrm2(50, x, 2)
-        for _ in 1:10
-            x, vx = randn(rng, 100), randn(rng, 100)
-            @test check_errs(λ, randn(rng), x, vx)
-        end
+    # symv:
+    for ul in ['L', 'U']
+        α_gen, A_gen, x_gen = sc, mPP, vP
+        _α, _A, _x = α_gen(), A_gen(), x_gen()
+
+        # α != 1 tests.
+        _symv_α = α->symv(ul, α, _A, _x)
+        _symv_A = A->symv(ul, _α, A, _x)
+        _symv_x = x->symv(ul, _α, _A, x)
+        _∇symv_α = (y, ȳ, α)->∇(symv, Val{2}, (), y, ȳ, ul, α, _A, _x)
+        _∇symv_A = (y, ȳ, A)->∇(symv, Val{3}, (), y, ȳ, ul, _α, A, _x)
+        _∇symv_A_inp = (y, ȳ, A)->∇(fill!(similar(A), 0), symv, Val{3}, (), y, ȳ, ul, _α, A, _x)
+        _∇symv_x = (y, ȳ, x)->∇(symv, Val{4}, (), y, ȳ, ul, _α, _A, x)
+        _∇symv_x_inp = (y, ȳ, x)->∇(fill!(similar(x), 0), symv, Val{4}, (), y, ȳ, ul, _α, _A, x)
+
+        @test check_errs(N, _symv_α, _∇symv_α, vP, sc, sc)
+        @test check_errs(N, _symv_A, _∇symv_A, vP, A_gen, A_gen)
+        @test check_errs(N, _symv_A, _∇symv_A_inp, vP, A_gen, A_gen)
+        @test check_errs(N, _symv_x, _∇symv_x, vP, x_gen, x_gen)
+        @test check_errs(N, _symv_x, _∇symv_x_inp, vP, x_gen, x_gen)
+
+        # α = 1 tests.
+        _symv_A = A->symv(ul, A, _x)
+        _symv_x = x->symv(ul, _A, x)
+        _∇symv_A = (y, ȳ, A)->∇(symv, Val{2}, (), y, ȳ, ul, A, _x)
+        _∇symv_A_inp = (y, ȳ, A)->∇(fill!(similar(A), 0), symv, Val{2}, (), y, ȳ, ul, A, _x)
+        _∇symv_x = (y, ȳ, x)->∇(symv, Val{3}, (), y, ȳ, ul, _A, x)
+        _∇symv_x_inp = (y, ȳ, x)->∇(fill!(similar(x), 0), symv, Val{3}, (), y, ȳ, ul, _A, x)
+
+        @test check_errs(N, _symv_A, _∇symv_A, vP, A_gen, A_gen)
+        @test check_errs(N, _symv_A, _∇symv_A_inp, vP, A_gen, A_gen)
+        @test check_errs(N, _symv_x, _∇symv_x, vP, x_gen, x_gen)
+        @test check_errs(N, _symv_x, _∇symv_x_inp, vP, x_gen, x_gen)
     end
 
-    import Base.BLAS.asum
-    let rng = MersenneTwister(123456)
-        λ = x->asum(50, x, 2)
-        for _ in 1:10
-            x, vx = randn(rng, 100), randn(rng, 100)
-            @test check_errs(asum, randn(rng), x, vx)
-            @test check_errs(λ, randn(rng), x, vx)
-        end
+    for f in [trmv, trsv], ul in ['L', 'U'], tA in ['N', 'T'], dA in ['N']
+        A_gen, x_gen = mPP, vP
+        _A, _x = A_gen(), x_gen()
+
+        _f_A = A->f(ul, tA, dA, A, _x)
+        _f_x = x->f(ul, tA, dA, _A, x)
+        _∇f_A = (y, ȳ, A)->∇(f, Val{4}, (), y, ȳ, ul, tA, dA, A, _x)
+        _∇f_x = (y, ȳ, x)->∇(f, Val{5}, (), y, ȳ, ul, tA, dA, _A, x)
+
+        @test check_errs(N, _f_A, _∇f_A, vP, A_gen, A_gen)
+        @test check_errs(N, _f_x, _∇f_x, vP, x_gen, x_gen)
+    end
+end
+
+
+################################## Level 3 ##################################
+let P = 10, Q = 6, rng = MersenneTwister(123456), N = 10
+
+    # Utility random generators.
+    sc, mPP, mQQ = ()->randn(rng), ()->randn(rng, P, P), ()->randn(rng, Q, Q)
+    mPQ, mQP = ()->randn(rng, P, Q), ()->randn(rng, Q, P)
+
+    # gemm:
+    for tA in ['T', 'N'], tB in ['T', 'N']
+
+        # Generate conformal test matrices.
+        A_gen = mPQ
+        B_gen = tA == 'N' ?
+                    (tB == 'N' ? mQP : mPQ) :
+                    (tB == 'T' ? mQP : mPQ)
+        C_gen = tA == 'N' ? mPP : mQQ
+
+        # α != 1 tests.
+        _α, _A, _B = sc(), A_gen(), B_gen()
+        _gemm_α = α->gemm(tA, tB, α, _A, _B)
+        _gemm_A = A->gemm(tA, tB, _α, A, _B)
+        _gemm_B = B->gemm(tA, tB, _α, _A, B)
+        _∇gemm_α = (Y, Ȳ, α)->∇(gemm, Val{3}, (), Y, Ȳ, tA, tB, α, _A, _B)
+        _∇gemm_A = (Y, Ȳ, A)->∇(gemm, Val{4}, (), Y, Ȳ, tA, tB, _α, A, _B)
+        _∇gemm_B = (Y, Ȳ, B)->∇(gemm, Val{5}, (), Y, Ȳ, tA, tB, _α, _A, B)
+        _∇gemm_A_inp = (Y, Ȳ, A)->∇(fill!(similar(A), 0), gemm, Val{4}, (), Y, Ȳ, tA, tB, _α, A, _B)
+        _∇gemm_B_inp = (Y, Ȳ, B)->∇(fill!(similar(B), 0), gemm, Val{5}, (), Y, Ȳ, tA, tB, _α, _A, B)
+
+        @test check_errs(N, _gemm_α, _∇gemm_α, C_gen, sc, sc)
+        @test check_errs(N, _gemm_A, _∇gemm_A, C_gen, A_gen, A_gen)
+        @test check_errs(N, _gemm_A, _∇gemm_A_inp, C_gen, A_gen, A_gen)
+        @test check_errs(N, _gemm_B, _∇gemm_B, C_gen, B_gen, B_gen)
+        @test check_errs(N, _gemm_B, _∇gemm_B_inp, C_gen, B_gen, B_gen)
+
+        # α = 1 tests.
+        _A, _B = A_gen(), B_gen()
+        _gemm_A = A->gemm(tA, tB, A, _B)
+        _gemm_B = B->gemm(tA, tB, _A, B)
+        _∇gemm_A = (Y, Ȳ, A)->∇(gemm, Val{3}, (), Y, Ȳ, tA, tB, A, _B)
+        _∇gemm_B = (Y, Ȳ, B)->∇(gemm, Val{4}, (), Y, Ȳ, tA, tB, _A, B)
+        _∇gemm_A_inp = (Y, Ȳ, A)->∇(fill!(similar(A), 0), gemm, Val{3}, (), Y, Ȳ, tA, tB, A, _B)
+        _∇gemm_B_inp = (Y, Ȳ, B)->∇(fill!(similar(B), 0), gemm, Val{4}, (), Y, Ȳ, tA, tB, _A, B)
+
+        @test check_errs(N, _gemm_A, _∇gemm_A, C_gen, A_gen, A_gen)
+        @test check_errs(N, _gemm_A, _∇gemm_A_inp, C_gen, A_gen, A_gen)
+        @test check_errs(N, _gemm_B, _∇gemm_B, C_gen, B_gen, B_gen)
+        @test check_errs(N, _gemm_B, _∇gemm_B_inp, C_gen, B_gen, B_gen)
     end
 
-    # Test each of the four permutations of `gemm`.
-    import Base.BLAS.gemm
-    let rng = MersenneTwister(123456), N = 100
-        for tA in ['T', 'N'], tB in ['T', 'N']
-            λ, γ = (α, A, B)->gemm(tA, tB, α, A, B), (A, B)->gemm(tA, tB, A, B)
-            for _ in 1:10
-                α, vα = randn.([rng, rng])
-                A, B, VA, VB = randn.(rng, [N, N, N, N], [N, N, N, N])
-                @test check_errs(λ, λ(α, A, B), (α, A, B), (vα, VA, VB))
-                @test check_errs(γ, γ(A, B), (A, B), (VA, VB))
-            end
-        end
+    # symm:
+    for side in ['L', 'R'], ul in ['L', 'U']
+
+        # Fixed qtts.
+        _α, _A, _B = sc(), mPP(), side == 'L' ? mPQ() : mQP()
+
+        # α != 1 tests.
+        _symm_α = α->symm(side, ul, α, _A, _B)
+        _symm_A = A->symm(side, ul, _α, A, _B)
+        _symm_B = B->symm(side, ul, _α, _A, B)
+        _∇symm_α = (Y, Ȳ, α)->∇(symm, Val{3}, (), Y, Ȳ, side, ul, α, _A, _B)
+        _∇symm_A = (Y, Ȳ, A)->∇(symm, Val{4}, (), Y, Ȳ, side, ul, _α, A, _B)
+        _∇symm_B = (Y, Ȳ, B)->∇(symm, Val{5}, (), Y, Ȳ, side, ul, _α, _A, B)
+        _∇symm_A_inp = (Y, Ȳ, A)->∇(fill!(similar(A), 0), symm, Val{4}, (), Y, Ȳ, side, ul, _α, A, _B)
+        _∇symm_B_inp = (Y, Ȳ, B)->∇(fill!(similar(B), 0), symm, Val{5}, (), Y, Ȳ, side, ul, _α, _A, B)
+
+        B_gen = side == 'L' ? mPQ : mQP
+        @test check_errs(N, _symm_α, _∇symm_α, B_gen, sc, sc)
+        @test check_errs(N, _symm_A, _∇symm_A, B_gen, mPP, mPP)
+        @test check_errs(N, _symm_A, _∇symm_A_inp, B_gen, mPP, mPP)
+        @test check_errs(N, _symm_B, _∇symm_B, B_gen, B_gen, B_gen)
+        @test check_errs(N, _symm_B, _∇symm_B_inp, B_gen, B_gen, B_gen)
+
+        # α = 1 tests.
+        _symm_A = A->symm(side, ul, A, _B)
+        _symm_B = B->symm(side, ul, _A, B)
+        _∇symm_A = (Y, Ȳ, A)->∇(symm, Val{3}, (), Y, Ȳ, side, ul, A, _B)
+        _∇symm_B = (Y, Ȳ, B)->∇(symm, Val{4}, (), Y, Ȳ, side, ul, _A, B)
+        _∇symm_A_inp = (Y, Ȳ, A)->∇(fill!(similar(A), 0), symm, Val{3}, (), Y, Ȳ, side, ul, A, _B)
+        _∇symm_B_inp = (Y, Ȳ, B)->∇(fill!(similar(B), 0), symm, Val{4}, (), Y, Ȳ, side, ul, _A, B)
+
+        B_gen = side == 'L' ? mPQ : mQP
+        @test check_errs(N, _symm_A, _∇symm_A, B_gen, mPP, mPP)
+        @test check_errs(N, _symm_A, _∇symm_A_inp, B_gen, mPP, mPP)
+        @test check_errs(N, _symm_B, _∇symm_B, B_gen, B_gen, B_gen)
+        @test check_errs(N, _symm_B, _∇symm_B_inp, B_gen, B_gen, B_gen)
     end
 
-    # Test both permutations of `gemv`.
-    import Base.BLAS.gemv
-    let rng = MersenneTwister(123456), N = 100
-        for tA in ['T', 'N']
-            λ, γ = (α, A, x)->gemv('T', α, A, x), (A, x)->gemv('T', A, x)
-            for _ in 1:10
-                α, vα = randn.([rng, rng])
-                A, VA = randn.(rng, [N, N], [N, N])
-                x, vx = randn.(rng, [N, N])
-                @test check_errs(λ, λ(α, A, x), (α, A, x), (vα, VA, vx))
-                @test check_errs(γ, γ(A, x), (A, x), (VA, vx))
-            end
-        end
-    end
+    # trmm / trsm:
+    for f in [trmm, trsm], side in ['L', 'R'], ul in ['L', 'U'], tA in ['N', 'T'], dA in ['N']
+        A_gen = ()->mPP() + 1e-3I
+        B_gen = side == 'L' ? mPQ : mQP
+        C_gen = B_gen
 
-    # Test all four permutations of `symm`.
-    import Base.BLAS.symm
-    let rng = MersenneTwister(123456), N = 100
-        lmask, umask = full(LowerTriangular(ones(N, N))), full(UpperTriangular(ones(N, N)))
-        for side in ['L', 'R'], ul in ['L', 'U']
-            λ, γ = (α, A, B)->symm(side, ul, α, A, B), (A, B)->symm(side, ul, A, B)
-            for _ in 1:10
-                α, vα = randn.([rng, rng])
-                A, B, VA, VB = randn.(rng, [N, N, N, N], [N, N, N, N])
-                @test check_errs(λ, λ(α, A, B), (α, A, B), (vα, VA, VB))
-                @test check_errs(γ, γ(A, B), (A, B), (VA, VB))
-            end
-        end
-    end
+        _α, _A, _B = sc(), A_gen(), B_gen()
+        _trmm_α = α->f(side, ul, tA, dA, α, _A, _B)
+        _trmm_A = A->f(side, ul, tA, dA, _α, A, _B)
+        _trmm_B = B->f(side, ul, tA, dA, _α, _A, B)
+        _∇trmm_α = (Y, Ȳ, α)->∇(f, Val{5}, (), Y, Ȳ, side, ul, tA, dA, α, _A, _B)
+        _∇trmm_A = (Y, Ȳ, A)->∇(f, Val{6}, (), Y, Ȳ, side, ul, tA, dA, _α, A, _B)
+        _∇trmm_B = (Y, Ȳ, B)->∇(f, Val{7}, (), Y, Ȳ, side, ul, tA, dA, _α, _A, B)
 
-    import Base.BLAS.symv
-    let rng = MersenneTwister(123456), N = 100
-        for ul in ['L', 'U']
-            λ, γ = (α, A, x)->symv(ul, α, A, x), (A, x)->symv(ul, A, x)
-            for _ in 1:10
-                α, vα = randn.([rng, rng])
-                A, VA = randn.(rng, [N, N], [N, N])
-                x, vx = randn.(rng, [N, N])
-                @test check_errs(λ, λ(α, A, x), (α, A, x), (vα, VA, vx))
-                @test check_errs(γ, γ(A, x), (A, x), (VA, vx))
-            end
-        end
+        @test check_errs(N, _trmm_α, _∇trmm_α, C_gen, sc, sc)
+        @test check_errs(N, _trmm_A, _∇trmm_A, C_gen, A_gen, A_gen)
+        @test check_errs(N, _trmm_B, _∇trmm_B, C_gen, B_gen, B_gen)
     end
-
-    import Base.BLAS.trmm
-    let rng = MersenneTwister(123456), N = 10
-        for side in ['L', 'R'], ul in ['L', 'U'], tA in ['N', 'T'], dA in ['N']
-            λ = (α, A, B)->trmm(side, ul, tA, dA, α, A, B)
-            for _ in 1:10
-                α, vα = randn.([rng, rng])
-                A, B, VA, VB = randn.(rng, [N, N, N, N], [N, N, N, N])
-                @test check_errs(λ, λ(α, A, B), (α, A, B), (vα, VA, VB))
-            end
-        end
-    end
-
-    import Base.BLAS.trmv
-    let rng = MersenneTwister(123456), N = 10
-        for ul in ['L', 'U'], tA in ['N', 'T'], dA in ['N']
-            λ = (A, b)->trmv(ul, tA, dA, A, b)
-            for _ in 1:10
-                A, VA = randn.(rng, [N, N], [N, N])
-                b, vb = randn.(rng, [N, N])
-                @test check_errs(λ, λ(A, b), (A, b), (VA, vb))
-            end
-        end
-    end
-
-    import Base.BLAS.trsm
-    let rng = MersenneTwister(123456), N = 10
-        for side in ['L', 'R'], ul in ['L', 'U'], tA in ['N', 'T'], dA in ['N']
-            λ = (α, A, X)->trsm(side, ul, tA, dA, α, A, X)
-            for _ in 1:10
-                α, vα = randn.([rng, rng])
-                A, X, VA, VX = randn.(rng, [N, N, N, N], [N, N, N, N])
-                A = randn(rng, N, N) + UniformScaling(3)
-                @test check_errs(λ, λ(α, A, X), (α, A, X), (vα, VA, VX))
-            end
-        end
-    end
-
-    import Base.BLAS.trsv
-    let rng = MersenneTwister(123456), N = 10
-        for ul in ['L', 'U'], tA in ['N', 'T'], dA in ['N']
-            λ = (A, x)->trsv(ul, tA, dA, A, x)
-            for _ in 1:10
-                A = randn(rng, N, N) + UniformScaling(1)
-                A = A.'A
-                VA = randn(rng, N, N)
-                x, vx = randn.(rng, [N, N])
-                @test check_errs(λ, λ(A, x), (A, x), (VA, vx))
-            end
-        end
-    end
+end
 end
