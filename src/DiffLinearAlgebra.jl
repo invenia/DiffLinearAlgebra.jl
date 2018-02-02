@@ -1,4 +1,4 @@
-module DiffLinAlg
+module DiffLinearAlgebra
 
     using FDM
 

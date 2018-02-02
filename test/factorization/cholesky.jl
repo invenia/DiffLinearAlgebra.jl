@@ -1,5 +1,5 @@
 @testset "Cholesky" begin
-    import DiffLinAlg: level2partition, level3partition, chol_unblocked_rev,
+    import DiffLinearAlgebra: level2partition, level3partition, chol_unblocked_rev,
         chol_blocked_rev
 
     let rng = MersenneTwister(123456), N = 5

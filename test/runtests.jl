@@ -1,7 +1,7 @@
-using DiffLinAlg, Base.Test
+using DiffLinearAlgebra, Base.Test
 
 import FDM: assert_approx_equal, central_fdm
-import DiffLinAlg: AA, AM, AVM, AS, ASVM, Arg1, Arg2
+import DiffLinearAlgebra: AA, AM, AVM, AS, ASVM, Arg1, Arg2
 
 import BenchmarkTools: @benchmark
 
