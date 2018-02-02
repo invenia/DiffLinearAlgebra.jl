@@ -1,4 +1,5 @@
 # DiffLinearAlgebra
+The current version of this package is not intended for general consumption.
 
 [![Build Status](https://travis-ci.org/invenia/DiffLinearAlgebra.jl.svg?branch=master)](https://travis-ci.org/invenia/DiffLinearAlgebra.jl)
 
