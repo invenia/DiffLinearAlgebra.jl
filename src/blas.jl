@@ -1,9 +1,6 @@
 import Base.LinAlg.BLAS: asum, dot, blascopy!, nrm2, scal, scal!, gemm, gemm!, gemv, gemv!,
     syrk, symm, symm!, symv, symv!, trmm, trsm, trmv, trsv, trsv!, ger!
 
-# Ensure that only blas-valid floats are used, and the complex values are not used.
-const BF = Union{Float32, Float64}
-
 ################################## Level 1 ##################################
 
 # Unit-stride `dot`.

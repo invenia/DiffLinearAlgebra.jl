@@ -1,203 +1,68 @@
 import Base: det, logdet, diagm, Diagonal, diag
 export diag, diagm, Diagonal
 
-const ∇ScalarDiag = Diagonal{<:∇Scalar}
-
-@explicit_intercepts diag Tuple{∇AbstractMatrix}
-function ∇(
-    ::typeof(diag),
-    ::Type{Arg{1}},
-    p,
-    y::∇AbstractVector,
-    ȳ::∇AbstractVector,
-    x::∇AbstractMatrix,
-)
-    x̄ = zeros(x)
-    x̄[diagind(x̄)] = ȳ
-    return x̄
+function ∇(::typeof(diag), ::Arg1, p, y::AV, ȳ::AV, X::AM)
+    X̄ = fill!(similar(X), zero(eltype(X)))
+    X̄[diagind(X̄)] = ȳ
+    return X̄
 end
-function ∇(
-    x̄::∇AbstractMatrix,
-    ::typeof(diag),
-    ::Type{Arg{1}},
-    p,
-    y::∇AbstractVector,
-    ȳ::∇AbstractVector,
-    x::∇AbstractMatrix,
-)
-    x̄_diag = view(x̄, diagind(x̄))
-    x̄_diag .+= ȳ
-    return x̄
+function ∇(X̄::AM, ::typeof(diag), ::Arg1, p, y::AV, ȳ::AV, X::AM)
+    X̄_diag = view(X̄, diagind(X̄))
+    X̄_diag .+= ȳ
+    return X̄
 end
 
-@explicit_intercepts diag Tuple{∇AbstractMatrix, Integer} [true, false]
-function ∇(
-    ::typeof(diag),
-    ::Type{Arg{1}},
-    p,
-    y::∇AbstractVector,
-    ȳ::∇AbstractVector,
-    x::∇AbstractMatrix,
-    k::Integer,
-)
-    x̄ = zeros(x)
-    x̄[diagind(x̄, k)] = ȳ
-    return x̄
+function ∇(::typeof(diag), ::Arg1, p, y::AV, ȳ::AV, X::AM, k::Integer)
+    X̄ = fill!(similar(X), zero(eltype(X)))
+    X̄[diagind(X̄, k)] = ȳ
+    return X̄
 end
-function ∇(
-    x̄::∇AbstractMatrix,
-    ::typeof(diag),
-    ::Type{Arg{1}},
-    p,
-    y::∇AbstractVector,
-    ȳ::∇AbstractVector,
-    x::∇AbstractMatrix,
-    k::Integer,
-)
-    x̄_diag = view(x̄, diagind(x̄, k))
-    x̄_diag .+= ȳ
-    return x̄
+function ∇(X̄::AM, ::typeof(diag), ::Arg1, p, y::AV, ȳ::AV, X::AM, k::Integer)
+    X̄_diag = view(X̄, diagind(X̄, k))
+    X̄_diag .+= ȳ
+    return X̄
 end
 
-@explicit_intercepts diagm Tuple{∇AbstractVector}
-function ∇(
-    ::typeof(diagm),
-    ::Type{Arg{1}},
-    p,
-    Y::∇AbstractMatrix,
-    Ȳ::∇AbstractMatrix,
-    x::∇AbstractVector,
-)
-    return copy!(similar(x), view(Ȳ, diagind(Ȳ)))
-end
-function ∇(
-    x̄::∇AbstractVector,
-    ::typeof(diagm),
-    ::Type{Arg{1}},
-    p,
-    Y::∇AbstractMatrix,
-    Ȳ::∇AbstractMatrix,
-    x::∇AbstractVector,
-)
-    return broadcast!(+, x̄, x̄, view(Ȳ, diagind(Ȳ)))
-end
+∇(::typeof(diagm), ::Arg1, p, Y::AM, Ȳ::AM, x::AV) =
+    copy!(similar(x), view(Ȳ, diagind(Ȳ)))
+∇(x̄::AV, ::typeof(diagm), ::Arg1, p, Y::AM, Ȳ::AM, x::AV) =
+    broadcast!(+, x̄, x̄, view(Ȳ, diagind(Ȳ)))
 
-@explicit_intercepts diagm Tuple{∇AbstractVector, Integer} [true, false]
-function ∇(
-    ::typeof(diagm),
-    ::Type{Arg{1}},
-    p,
-    Y::∇AbstractMatrix,
-    Ȳ::∇AbstractMatrix,
-    x::∇AbstractVector,
-    k::Integer,
-)
-    return copy!(similar(x), view(Ȳ, diagind(Ȳ, k)))
-end
-function ∇(
-    x̄::∇AbstractVector,
-    ::typeof(diagm),
-    ::Type{Arg{1}},
-    p,
-    Y::∇AbstractMatrix,
-    Ȳ::∇AbstractMatrix,
-    x::∇AbstractVector,
-    k::Integer,
-)
-    return broadcast!(+, x̄, x̄, view(Ȳ, diagind(Ȳ, k)))
-end
+∇(::typeof(diagm), ::Arg1, p, Y::AM, Ȳ::AM, x::AV, k::Integer) =
+    copy!(similar(x), view(Ȳ, diagind(Ȳ, k)))
+∇(x̄::AV, ::typeof(diagm), ::Arg1, p, Y::AM, Ȳ::AM, x::AV, k::Integer) =
+    broadcast!(+, x̄, x̄, view(Ȳ, diagind(Ȳ, k)))
 
-@explicit_intercepts diagm Tuple{∇Scalar}
-function ∇(
-    ::typeof(diagm),
-    ::Type{Arg{1}},
-    p,
-    Y::∇AbstractMatrix,
-    Ȳ::∇AbstractMatrix,
-    x::∇Scalar,
-)
+function ∇(::typeof(diagm), ::Arg1, p, Y::AM, Ȳ::AM, x::Real)
     length(Ȳ) != 1 && throw(error("Ȳ isn't a 1x1 matrix."))
     return Ȳ[1]
 end
 
-@explicit_intercepts Diagonal Tuple{∇AbstractVector}
-function ∇(
-    ::Type{Diagonal},
-    ::Type{Arg{1}},
-    p,
-    Y::∇ScalarDiag,
-    Ȳ::∇ScalarDiag,
-    x::∇AbstractVector,
-)
-    return copy!(similar(x), Ȳ.diag)
-end
-function ∇(
-    x̄::∇AbstractVector,
-    ::Type{Diagonal},
-    ::Type{Arg{1}},
-    p,
-    Y::∇ScalarDiag,
-    Ȳ::∇ScalarDiag,
-    x::∇AbstractVector,
-)
-    return broadcast!(+, x̄, x̄, Ȳ.diag)
-end
+∇(::Type{Diagonal}, ::Arg1, p, Y::Diagonal{<:Real}, Ȳ::Diagonal{<:Real}, x::AV) =
+    copy!(similar(x), Ȳ.diag)
+∇(x̄::AV, ::Type{Diagonal}, ::Arg1, p, Y::Diagonal{<:Real}, Ȳ::Diagonal{<:Real}, x::AV) =
+    broadcast!(+, x̄, x̄, Ȳ.diag)
 
-@explicit_intercepts Diagonal Tuple{∇AbstractMatrix}
-function ∇(
-    ::Type{Diagonal},
-    ::Type{Arg{1}},
-    p,
-    Y::∇ScalarDiag,
-    Ȳ::∇ScalarDiag,
-    X::∇AbstractMatrix,
-)
+function ∇(::Type{Diagonal}, ::Arg1, p, Y::Diagonal{<:Real}, Ȳ::Diagonal{<:Real}, X::AM)
     X̄ = zeros(X)
     copy!(view(X̄, diagind(X)), Ȳ.diag)
     return X̄
 end
-function ∇(
-    X̄::∇AbstractMatrix,
-    ::Type{Diagonal},
-    ::Type{Arg{1}},
-    p,
-    Y::∇ScalarDiag,
-    Ȳ::∇ScalarDiag,
-    X::∇AbstractMatrix,
-)
+function ∇(X̄::AM, ::Type{Diagonal}, ::Arg1, p, Y::Diagonal{<:Real}, Ȳ::Diagonal{<:Real}, X::AM)
     X̄_diag = view(X̄, diagind(X̄))
     broadcast!(+, X̄_diag, X̄_diag, Ȳ.diag)
     return X̄
 end
 
-@explicit_intercepts det Tuple{Diagonal{<:∇Scalar}}
-∇(::typeof(det), ::Type{Arg{1}}, p, y::∇Scalar, ȳ::∇Scalar, X::∇ScalarDiag) =
+∇(::typeof(det), ::Arg1, p, y::Real, ȳ::Real, X::Diagonal{<:Real}) =
     Diagonal(ȳ .* y ./ X.diag)
-function ∇(
-    X̄::∇ScalarDiag,
-    ::typeof(det),
-    ::Type{Arg{1}},
-    p,
-    y::∇Scalar,
-    ȳ::∇Scalar,
-    X::∇ScalarDiag,
-)
+function ∇(X̄::Diagonal{<:Real}, ::typeof(det), ::Arg1, p, y::Real, ȳ::Real, X::Diagonal{<:Real})
     broadcast!((x̄, x, y, ȳ)->x̄ + ȳ * y / x, X̄.diag, X̄.diag, X.diag, y, ȳ)
     return X̄
 end
 
-@explicit_intercepts logdet Tuple{Diagonal{<:∇Scalar}}
-∇(::typeof(logdet), ::Type{Arg{1}}, p, y::∇Scalar, ȳ::∇Scalar, X::∇ScalarDiag) =
-    Diagonal(ȳ ./ X.diag)
-function ∇(
-    X̄::∇ScalarDiag,
-    ::typeof(logdet),
-    ::Type{Arg{1}},
-    p,
-    y::∇Scalar,
-    ȳ::∇Scalar,
-    X::∇ScalarDiag,
-)
+∇(::typeof(logdet), ::Arg1, p, y::Real, ȳ::Real, X::Diagonal{<:Real}) = Diagonal(ȳ ./ X.diag)
+function ∇(X̄::Diagonal{<:Real}, ::typeof(logdet), ::Arg1, p, y::Real, ȳ::Real, X::Diagonal{<:Real})
     broadcast!((x̄, x, ȳ)->x̄ + ȳ / x, X̄.diag, X̄.diag, X.diag, ȳ)
     return X̄
 end
