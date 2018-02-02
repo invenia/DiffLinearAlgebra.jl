@@ -42,14 +42,17 @@
     end
 
     # Check sensitivities for lower-triangular version.
-    let P = 500, rng = MersenneTwister(123456), N = 10
+    let P = 15, rng = MersenneTwister(123456), N = 10
 
-        Σ_gen = ()->(A = randn(rng, P, P); A'A + 1e-6I)
+        Σ_gen = ()->(A = randn(rng, P, P); A'A + 1e-3I)
         S_gen, H_gen = ()->Symmetric(Σ_gen()), ()->Hermitian(Σ_gen())
         U_gen = ()->chol(S_gen())
 
-        @test check_errs(N, unary_ȲD(chol)..., U_gen, Σ_gen, Σ_gen)
-        @test check_errs(N, unary_ȲD(chol)..., U_gen, H_gen, H_gen)
-        @test check_errs(N, unary_ȲD(chol)..., U_gen, S_gen, S_gen)
+        _chol = Σ->chol(Symmetric(Σ))
+        _∇chol = (Y, Ȳ, Σ)->∇(chol, Val{1}, (), Y, Ȳ, Symmetric(Σ))
+
+        @test check_errs(N, _chol, _∇chol, U_gen, Σ_gen, Σ_gen)
+        @test check_errs(N, _chol, _∇chol, U_gen, H_gen, H_gen)
+        @test check_errs(N, _chol, _∇chol, U_gen, S_gen, S_gen)
     end
 end
