@@ -1,5 +1,5 @@
 import Base.LinAlg.BLAS: gemv, gemv!, gemm!, trsm!, axpy!, ger!
-import Base.LinAlg.chol
+import Base.LinAlg: chol, copytri!
 
 #=
 See [1] for implementation details: pages 5-9 in particular. The derivations presented in
@@ -7,14 +7,33 @@ See [1] for implementation details: pages 5-9 in particular. The derivations pre
 implement both the derivations in [1] and their transpose, which is more appropriate to
 Julia.
 
+[2] suggests that implementing these operations at the highest level of abstraction is the
+way forward. There is, therefore, some code below to see what happens when we do this.
+
 [1] - "Differentiation of the Cholesky decomposition", Murray 2016
+[2] - "Auto-Differentiating Linear Algebra", Seeger et. al 2017.
 =#
 
-const AM = AbstractMatrix
 const UT = UpperTriangular
-@explicit_intercepts chol Tuple{AbstractMatrix{<:∇Scalar}}
-∇(::typeof(chol), ::Type{Arg{1}}, p, U::UT{T}, Ū::AM{T}, Σ::AM{T}) where T<:∇Scalar =
+∇(::typeof(chol), ::Arg1, p, U::UT{T}, Ū::AM{T}, Σ::AM{T}) where T<:BF =
     chol_blocked_rev(full(Ū), full(U), 25, true)
+
+# Experimental code implementing the algebraic sensitivities discussed in [2].
+# """
+#     ∇(::typeof(chol), ::Arg1, p, U::UT{T}, Ū::AM{T}, Σ::AM{T}) where T<:BF
+
+# Transform Ū into Σ̄ in a non-allocating manner.
+# """
+# function ∇(::typeof(chol), ::Arg1, p, U::UT{T}, Ū::AM{T}, Σ::AM{T}, ::Symbol) where T<:BF
+#     Σ̄ = A_mul_Bt!(Ū, U)
+#     Σ̄ = copytri!(Σ̄, 'U')
+#     Σ̄ = A_ldiv_B!(U, Σ̄)
+#     BLAS.trsm!('R', 'U', 'T', 'N', one(T), U.data, Σ̄)
+#     @inbounds for n in diagind(Σ̄)
+#         Σ̄[n] *= 0.5
+#     end
+#     return Σ̄
+# end
 
 """
     level2partition(A::AbstractMatrix, j::Int, upper::Bool)
@@ -125,7 +144,7 @@ chol_unblocked_rev(Σ̄::AM, L::AM, upper::Bool) = chol_unblocked_rev!(copy(Σ̄
         L::AbstractMatrix{T},
         Nb::Int,
         upper::Bool
-    ) where T<:∇Scalar
+    ) where T<:BF
 
 Compute the sensitivities of the Cholesky factorisation using a blocked, cache-friendly 
 procedure. `Σ̄` are the sensitivities of `L`, and will be transformed into the sensitivities
@@ -133,7 +152,7 @@ of `Σ`, where `Σ = LLᵀ`. `Nb` is the block-size to use. If the upper triangl
 to represent the factorization, that is `Σ = UᵀU` where `U := Lᵀ`, then this should be
 indicated by passing `upper = true`.
 """
-function chol_blocked_rev!(Σ̄::AM{T}, L::AM{T}, Nb::Int, upper::Bool) where T<:∇Scalar
+function chol_blocked_rev!(Σ̄::AM{T}, L::AM{T}, Nb::Int, upper::Bool) where T<:BF
 
     # Check that L is square, that Σ̄ is square and that they are the same size.
     M, N = size(Σ̄)

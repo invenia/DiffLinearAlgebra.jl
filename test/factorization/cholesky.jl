@@ -1,6 +1,7 @@
 @testset "Cholesky" begin
+    import DiffLinAlg: level2partition, level3partition, chol_unblocked_rev,
+        chol_blocked_rev
 
-    import Nabla: level2partition, level3partition
     let rng = MersenneTwister(123456), N = 5
         A = randn(rng, N, N)
         r, d, B2, c = level2partition(A, 4, false)
@@ -26,7 +27,6 @@
         @test transpose(C) == Cᵀ
     end
 
-    import Nabla: chol_unblocked_rev, chol_blocked_rev
     let rng = MersenneTwister(123456), N = 10
         A, Ā = full.(LowerTriangular.(randn.(rng, [N, N], [N, N])))
         B, B̄ = transpose.([A, Ā])
@@ -42,12 +42,14 @@
     end
 
     # Check sensitivities for lower-triangular version.
-    let rng = MersenneTwister(123456), N = 10
-        for _ in 1:10
-            B, VB = randn.(rng, [N, N], [N, N])
-            A, VA = B.'B + 1e-6I, VB.'VB + 1e-6I
-            Ū = UpperTriangular(randn(rng, N, N))
-            @test check_errs(chol, Ū, A, 1e-2 .* VA)
-        end
+    let P = 500, rng = MersenneTwister(123456), N = 10
+
+        Σ_gen = ()->(A = randn(rng, P, P); A'A + 1e-6I)
+        S_gen, H_gen = ()->Symmetric(Σ_gen()), ()->Hermitian(Σ_gen())
+        U_gen = ()->chol(S_gen())
+
+        @test check_errs(N, unary_ȲD(chol)..., U_gen, Σ_gen, Σ_gen)
+        @test check_errs(N, unary_ȲD(chol)..., U_gen, H_gen, H_gen)
+        @test check_errs(N, unary_ȲD(chol)..., U_gen, S_gen, S_gen)
     end
 end

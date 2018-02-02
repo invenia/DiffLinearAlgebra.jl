@@ -17,7 +17,7 @@ module DiffLinAlg
     include("blas.jl")
     include("diagonal.jl")
     include("triangular.jl")
-    # include("uniformscaling.jl")
-    # include("factorization/cholesky.jl")
+    include("uniformscaling.jl")
+    include("factorization/cholesky.jl")
 
 end # module

@@ -1,9 +1,7 @@
 import Base: det, logdet, LowerTriangular, UpperTriangular
 export det, logdet, LowerTriangular, UpperTriangular
 
-const ∇ScalarLT = LowerTriangular{<:Real}
-const ∇ScalarUT = UpperTriangular{<:Real}
-
+const ∇ScalarLT, ∇ScalarUT = LowerTriangular{<:Real}, UpperTriangular{<:Real}
 for (ctor, T) in zip([:LowerTriangular, :UpperTriangular], [:∇ScalarLT, :∇ScalarUT])
 
     @eval begin
