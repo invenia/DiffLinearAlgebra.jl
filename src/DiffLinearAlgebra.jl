@@ -1,7 +1,5 @@
 module DiffLinearAlgebra
 
-    using FDM
-
     # Some aliases used repeatedly throughout the package.
     const AV, AM, AVM, AA = AbstractVector, AbstractMatrix, AbstractVecOrMat, AbstractArray
     const SV, SM, SVM, SA = StridedVector, StridedMatrix, StridedVecOrMat, StridedArray
