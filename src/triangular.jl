@@ -1,14 +1,18 @@
 import Base: det, logdet, LowerTriangular, UpperTriangular
 export det, logdet, LowerTriangular, UpperTriangular
 
-const ∇ScalarLT, ∇ScalarUT = LowerTriangular{<:Real}, UpperTriangular{<:Real}
-for (ctor, T) in zip([:LowerTriangular, :UpperTriangular], [:∇ScalarLT, :∇ScalarUT])
+for (ctor, ctor_sym, T, T_sym) in zip([:LowerTriangular, :UpperTriangular],
+                               [:(:(Base.LowerTriangular)), :(:(Base.UpperTriangular))],
+                               [:(LowerTriangular{<:Real}), :(UpperTriangular{<:Real})],
+                               [:(:(LowerTriangular{<:Real})), :(:(UpperTriangular{<:Real}))])
 
     @eval begin
 
+    push!(ops, DiffOp($ctor_sym, :(Tuple{DLA.AM}), [true]))
     ∇(::Type{$ctor}, ::Arg1, p, Y::$T, Ȳ::$T, X::AM) = full(Ȳ)
     ∇(X̄::AM, ::Type{$ctor}, ::Arg1, p, Y::$T, Ȳ::$T, X::AM) = broadcast!(+, X̄, X̄, Ȳ)
 
+    push!(ops, DiffOp(:(Base.det), Expr(:curly, :Tuple, $T_sym), [true]))
     ∇(::typeof(det), ::Arg1, p, y::Real, ȳ::Real, X::$T) =
         Diagonal(ȳ .* y ./ view(X, diagind(X)))
 
@@ -26,6 +30,7 @@ for (ctor, T) in zip([:LowerTriangular, :UpperTriangular], [:∇ScalarLT, :∇Sc
         return X̄
     end
 
+    push!(ops, DiffOp(:(Base.logdet), Expr(:curly, :Tuple, $T_sym), [true]))
     ∇(::typeof(logdet), ::Arg1, p, y::Real, ȳ::Real, X::$T) =
         Diagonal(ȳ ./ view(X, diagind(X)))
 

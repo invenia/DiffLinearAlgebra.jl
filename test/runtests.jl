@@ -7,10 +7,12 @@ import BenchmarkTools: @benchmark
 
 @testset "DiffLinearAlgebra" begin
     include("test_util.jl")
-    include("generic.jl")
-    include("blas.jl")
-    include("diagonal.jl")
-    include("triangular.jl")
-    include("uniformscaling.jl")
-    include("factorization/cholesky.jl")
+    include("util.jl")
+    # include("generic.jl")
+    # include("blas.jl")
+    # include("diagonal.jl")
+    # include("triangular.jl")
+    # include("uniformscaling.jl")
+    # include("factorization/cholesky.jl")
+    include("test_imports.jl")
 end
