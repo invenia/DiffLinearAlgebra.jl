@@ -5,7 +5,6 @@ os:
   - osx
 julia:
   - 0.6
-  - nightly
 notifications:
   email: false
 git:
@@ -14,8 +13,8 @@ git:
 ## uncomment the following lines to allow failures on nightly julia
 ## (tests will run but not make your overall status red)
 #matrix:
-#  allow_failures:
-#  - julia: nightly
+ allow_failures:
+ - julia: nightly
 
 ## uncomment and modify the following lines to manually install system packages
 #addons:
@@ -27,9 +26,9 @@ git:
 
 ## uncomment the following lines to override the default test script
 #script:
-#  - julia -e 'Pkg.clone(pwd()); Pkg.build("DiffLinAlg"); Pkg.test("DiffLinAlg"; coverage=true)'
+#  - julia -e 'Pkg.clone(pwd()); Pkg.build("DiffLinearAlgebra"); Pkg.test("DiffLinearAlgebra"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
-  - julia -e 'cd(Pkg.dir("DiffLinAlg")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
+  - julia -e 'cd(Pkg.dir("DiffLinearAlgebra")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
   # push coverage results to Codecov
-  - julia -e 'cd(Pkg.dir("DiffLinAlg")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+  - julia -e 'cd(Pkg.dir("DiffLinearAlgebra")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
